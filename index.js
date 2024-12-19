@@ -60,7 +60,8 @@ const dbConnect = async () => {
         await client.connect();
 
         // collection
-        const userCollection = await client.db("strideAssignmentCollection").collection("users");
+        const usersCollection = await client.db("strideAssignmentCollection").collection("users");
+        const productsCollection = await client.db("strideAssignmentCollection").collection("products");
 
 
         // verify buyer
@@ -71,7 +72,7 @@ const dbConnect = async () => {
                     return res.status(400).send({ message: "Email not found in token." });
                 }
 
-                const findBuyer = await userCollection.findOne({ email });
+                const findBuyer = await usersCollection.findOne({ email });
                 if (!findBuyer) {
                     return res.status(404).send({ message: "User not found." });
                 }
@@ -87,13 +88,61 @@ const dbConnect = async () => {
             }
         };
 
+        // verify seller
+        const verifySeller = async (req, res, next) => {
+            try {
+                const email = req.decoded?.email; // Safely access decoded.email
+                if (!email) {
+                    return res.status(400).send({ message: "Email not found in token." });
+                }
+
+                const findBuyer = await usersCollection.findOne({ email });
+                if (!findBuyer) {
+                    return res.status(404).send({ message: "User not found." });
+                }
+
+                if (findBuyer.role === "seller") {
+                    return next();
+                }
+
+                return res.status(403).send({ message: "The user is not a seller." });
+            } catch (error) {
+                console.error("Error in verifyBuyer middleware:", error);
+                return res.status(500).send({ message: "Internal server error." });
+            }
+        };
+
+        // verify Admin
+        const verifyAdmin = async (req, res, next) => {
+            try {
+                const email = req.decoded?.email; // Safely access decoded.email
+                if (!email) {
+                    return res.status(400).send({ message: "Email not found in token." });
+                }
+
+                const findBuyer = await usersCollection.findOne({ email });
+                if (!findBuyer) {
+                    return res.status(404).send({ message: "User not found." });
+                }
+
+                if (findBuyer.role === "admin") {
+                    return next();
+                }
+
+                return res.status(403).send({ message: "The user is not a admin." });
+            } catch (error) {
+                console.error("Error in verifyBuyer middleware:", error);
+                return res.status(500).send({ message: "Internal server error." });
+            }
+        };
+
 
         // crud
 
         // default admin
         const ensureAdminExists = async () => {
             const adminEmail = "sabab54874@rabitex.com"; // Replace with your admin's email
-            const existingAdmin = await userCollection.findOne({ email: adminEmail });
+            const existingAdmin = await usersCollection.findOne({ email: adminEmail });
 
             if (!existingAdmin) {
                 const defaultAdmin = {
@@ -106,7 +155,7 @@ const dbConnect = async () => {
                     updatedAt: new Date(),
                 };
 
-                await userCollection.insertOne(defaultAdmin);
+                await usersCollection.insertOne(defaultAdmin);
                 console.log("Default admin user created.");
             } else {
                 console.log("Admin user already exists.");
@@ -128,7 +177,7 @@ const dbConnect = async () => {
                 return
             }
 
-            const existingUser = await userCollection.findOne({ email });
+            const existingUser = await usersCollection.findOne({ email });
             if (existingUser) {
                 return res.status(400).send("User already exists.");
             }
@@ -149,8 +198,32 @@ const dbConnect = async () => {
                     user.totalCartPrice = null
             }
 
-            const result = await userCollection.insertOne(user)
+            const result = await usersCollection.insertOne(user)
             res.send(result)
+        })
+
+        // add product
+        app.post('/add-product', verifyJWT, verifySeller, async (req, res) => {
+            const { name, price, category, brand, details, stock, image } = req.body;
+
+            // Construct product object
+            const product = {
+                name,
+                price: parseFloat(price), // Ensure price is a number
+                category,
+                brand,
+                details,
+                stock: parseInt(stock), // Ensure stock is a number
+                image,
+                sellerEmail: req.decoded.email, // Use the seller's email from the token
+                ratings: [],
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            };
+
+            const result = await productsCollection.insertOne(product);
+            res.send(result)
+
         })
 
 
