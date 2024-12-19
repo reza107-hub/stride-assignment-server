@@ -233,6 +233,24 @@ const dbConnect = async () => {
             res.send(result)
         })
 
+        // delete user by Ban
+        app.patch('/ban-user/:id', verifyJWT, verifyAdmin, async (req, res) => {
+            const { id } = req.params;
+
+            // Update user status to 'banned'
+            const result = await usersCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { userStatus: "banned", updatedAt: new Date() } }
+            );
+
+            if (result.modifiedCount === 0) {
+                return res.status(404).send({ message: "User not found" });
+            }
+
+            res.send({ message: "User banned successfully" });
+        });
+
+
         // get product
         app.get('/get-products', async (req, res) => {
             const { name, category, brand, limit = 10, page = 1, sort } = req.query;
