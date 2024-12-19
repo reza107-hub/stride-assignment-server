@@ -42,7 +42,7 @@ const verifyJWT = (req, res, next) => {
 
 // mongodb
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `${process.env.MONGODB_URL}`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -265,6 +265,64 @@ const dbConnect = async () => {
             );
             res.send(result)
         })
+
+        // add cart
+        app.patch('/add-cart', verifyJWT, verifyBuyer, async (req, res) => {
+            const { productId, quantity } = req.body;
+
+            const email = req.decoded.email;
+
+            // Fetch product details to ensure it's valid
+            const product = await productsCollection.findOne({ _id: new ObjectId(toString(productId)) });
+            if (!product) {
+                return res.send({ message: "Product not found" });
+            }
+
+            // Get user and update cart
+            const user = await usersCollection.findOne({ email });
+            if (!user) {
+                return res.send({ message: "User not found" });
+            }
+
+            const productInCart = user.cart.find(item => item.productId.toString() === productId);
+
+            if (productInCart) {
+                // If the product is already in the cart, update the quantity
+                const updatedCart = user.cart.map(item =>
+                    item.productId.toString() === productId ?
+                        { ...item, quantity: item.quantity + quantity, totalPrice: item.totalPrice + (product.price * quantity) } : item
+                );
+
+                const updatedTotalCartPrice = updatedCart.reduce((acc, item) => acc + item.totalPrice, 0);
+
+                await usersCollection.updateOne(
+                    { email },
+                    {
+                        $set: { cart: updatedCart, totalCartPrice: updatedTotalCartPrice },
+                    }
+                );
+                return res.send({ message: "Cart updated successfully" });
+            } else {
+                // If the product is not in the cart, add it
+                const newItem = {
+                    productId,
+                    quantity,
+                    totalPrice: product.price * quantity
+                };
+
+                const updatedCart = [...user.cart, newItem];
+                const updatedTotalCartPrice = updatedCart.reduce((acc, item) => acc + item.totalPrice, 0);
+
+                await usersCollection.updateOne(
+                    { email },
+                    {
+                        $set: { cart: updatedCart, totalCartPrice: updatedTotalCartPrice },
+                    }
+                );
+                return res.send({ message: "Product added to cart successfully" });
+            }
+        });
+
 
 
 
