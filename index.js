@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config()
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = process.env.PORT || 4000
@@ -9,6 +10,32 @@ const port = process.env.PORT || 4000
 
 app.use(express.json());
 app.use(cors());
+
+// jwt
+
+app.post('/authentication', async (req, res) => {
+    const { email } = req.body;
+    const token = jwt.sign(email, process.env.SECRET_KEY, { expiresIn: `${process.env.TOKEN_EXP}` })
+    res.send({ token })
+})
+
+// jwt verify
+
+const verifyJWT = (req, res, next) => {
+    const authorization = req.header.authorization
+    if (!authorization) {
+        return res.send({ message: "Invalid authorization" })
+    }
+
+    const token = authorization.split(' ')[1]
+    jwt.verify(token, process.env.SECRET_KEY, (err, decoded) => {
+        if (err) {
+            return res.send({ message: "Invalid token" })
+        }
+        req.decoded = decoded
+        next()
+    })
+}
 
 // mongodb
 
@@ -91,6 +118,7 @@ const dbConnect = async () => {
             }
 
             const result = await userCollection.insertOne(user)
+            res.send(result)
         })
 
 
