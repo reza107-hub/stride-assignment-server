@@ -278,6 +278,38 @@ const dbConnect = async () => {
             res.send(result);
         });
 
+        // Update product
+        app.patch('/update-product/:id', verifyJWT, verifySeller, async (req, res) => {
+            const { id } = req.params;
+            const { name, price, category, brand, details, stock, image } = req.body;
+            const sellerEmail = req.decoded.email;
+
+            // Check if the product exists and belongs to the seller
+            const product = await productsCollection.findOne({ _id: new ObjectId(id), sellerEmail });
+            if (!product) {
+                return res.status(404).send({ message: "Product not found or you are not the seller" });
+            }
+
+            // Update only the provided fields
+            const updatedProduct = {};
+            if (name) updatedProduct.name = name;
+            if (price) updatedProduct.price = parseFloat(price);
+            if (category) updatedProduct.category = category;
+            if (brand) updatedProduct.brand = brand;
+            if (details) updatedProduct.details = details;
+            if (stock) updatedProduct.stock = parseInt(stock);
+            if (image) updatedProduct.image = image;
+            updatedProduct.updatedAt = new Date();
+
+            const result = await productsCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: updatedProduct }
+            );
+            res.send(result);
+        });
+
+
+
         // add product on wishlist
         app.patch('/add-to-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
             const { productId } = req.body;
