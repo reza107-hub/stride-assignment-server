@@ -15,6 +15,9 @@ app.use(cors());
 
 app.post('/authentication', async (req, res) => {
     const { email } = req.body;
+    if (!email) {
+        return res.status(400).send({ message: "Email is required" });
+    }
     const token = jwt.sign(email, process.env.SECRET_KEY, { expiresIn: `${process.env.TOKEN_EXP}` })
     res.send({ token })
 })
@@ -22,7 +25,7 @@ app.post('/authentication', async (req, res) => {
 // jwt verify
 
 const verifyJWT = (req, res, next) => {
-    const authorization = req.header.authorization
+    const authorization = req.headers.authorization
     if (!authorization) {
         return res.send({ message: "Invalid authorization" })
     }
@@ -60,6 +63,31 @@ const dbConnect = async () => {
         const userCollection = await client.db("strideAssignmentCollection").collection("users");
 
 
+        // verify buyer
+        const verifyBuyer = async (req, res, next) => {
+            try {
+                const email = req.decoded?.email; // Safely access decoded.email
+                if (!email) {
+                    return res.status(400).send({ message: "Email not found in token." });
+                }
+
+                const findBuyer = await userCollection.findOne({ email });
+                if (!findBuyer) {
+                    return res.status(404).send({ message: "User not found." });
+                }
+
+                if (findBuyer.role === "buyer") {
+                    return next();
+                }
+
+                return res.status(403).send({ message: "The user is not a buyer." });
+            } catch (error) {
+                console.error("Error in verifyBuyer middleware:", error);
+                return res.status(500).send({ message: "Internal server error." });
+            }
+        };
+
+
         // crud
 
         // default admin
@@ -91,6 +119,10 @@ const dbConnect = async () => {
         app.post('/create-user', async (req, res) => {
 
             const { email, name, image, role } = req.body;
+
+            if (!email || !name || !role) {
+                return res.status(400).send({ message: "Email, name, and role are required" });
+            }
 
             if (email === "sabab54874@rabitex.com") {
                 return
