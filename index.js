@@ -16,9 +16,9 @@ app.use(cors());
 app.post('/authentication', async (req, res) => {
     const { email } = req.body;
     if (!email) {
-        return res.status(400).send({ message: "Email is required" });
+        return res.send({ message: "Email is required" });
     }
-    const token = jwt.sign(email, process.env.SECRET_KEY, { expiresIn: `${process.env.TOKEN_EXP}` })
+    const token = jwt.sign({ email }, process.env.SECRET_KEY, { expiresIn: `${process.env.TOKEN_EXP}` })
     res.send({ token })
 })
 
@@ -26,7 +26,7 @@ app.post('/authentication', async (req, res) => {
 
 const verifyJWT = (req, res, next) => {
     const authorization = req.headers.authorization
-    if (!authorization) {
+    if (!authorization || !authorization.startsWith("Bearer ")) {
         return res.send({ message: "Invalid authorization" })
     }
 
@@ -202,6 +202,33 @@ const dbConnect = async () => {
             res.send(result)
         })
 
+        // get product
+        app.get('/get-products', async (req, res) => {
+            const { name, category, brand, limit = 10, page = 1, sort } = req.query;
+            const query = {};
+
+            // Add filters to the query
+            if (name) query.name = { $regex: name, $options: "i" }; // Case-insensitive partial match
+            if (category) query.category = category;
+            if (brand) query.brand = brand;
+
+            let sortOption = {};
+            if (sort === "asc") {
+                sortOption.price = 1; // Ascending order
+            } else if (sort === "desc") {
+                sortOption.price = -1; // Descending order
+            }
+
+            const products = await productsCollection
+                .find(query)
+                .sort(sortOption)
+                .skip((page - 1) * Number(limit)) // Pagination
+                .limit(Number(limit))
+                .toArray();
+
+            res.send(products);
+        })
+
         // add product
         app.post('/add-product', verifyJWT, verifySeller, async (req, res) => {
             const { name, price, category, brand, details, stock, image } = req.body;
@@ -224,6 +251,19 @@ const dbConnect = async () => {
             const result = await productsCollection.insertOne(product);
             res.send(result)
 
+        })
+
+        // add product on wishlist
+        app.patch('/add-to-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
+            const { productId } = req.body;
+            if (!productId) {
+                return res.send({ message: "Product ID is required" });
+            }
+            const result = await usersCollection.findOneAndUpdate(
+                { email: req.decoded.email },
+                { $addToSet: { wishlist: productId } },
+            );
+            res.send(result)
         })
 
 
