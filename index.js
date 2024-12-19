@@ -164,6 +164,37 @@ const dbConnect = async () => {
 
         await ensureAdminExists();
 
+        // View all users
+        app.get('/all-users', verifyJWT, verifyAdmin, async (req, res) => {
+            const users = await usersCollection.find().toArray();
+            res.send(users);
+        });
+
+        // Change user role
+        app.patch('/change-role/:id', verifyJWT, verifyAdmin, async (req, res) => {
+            const { id } = req.params;
+            const { role } = req.body;
+
+            // Check if the new role is valid
+            if (!['buyer', 'seller', 'admin'].includes(role)) {
+                return res.send({ message: "Invalid role" });
+            }
+
+            // Update the user's role
+            const result = await usersCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { role, updatedAt: new Date() } }
+            );
+
+            if (result.modifiedCount === 0) {
+                return res.send({ message: "User not found" });
+            }
+
+            res.send(result);
+        });
+
+
+
         // user create
         app.post('/create-user', async (req, res) => {
 
