@@ -229,6 +229,14 @@ const dbConnect = async () => {
             res.send(products);
         })
 
+        // seller View all their listed products
+
+        app.get('/seller-products', verifyJWT, verifySeller, async (req, res) => {
+            const sellerEmail = req.decoded.email;
+            const products = await productsCollection.find({ sellerEmail }).toArray();
+            res.send(products);
+        })
+
         // add product
         app.post('/add-product', verifyJWT, verifySeller, async (req, res) => {
             const { name, price, category, brand, details, stock, image } = req.body;
@@ -252,6 +260,23 @@ const dbConnect = async () => {
             res.send(result)
 
         })
+
+        // seller can delete their product
+
+        app.delete('/delete-product/:id', verifyJWT, verifySeller, async (req, res) => {
+            const { id } = req.params;
+            const sellerEmail = req.decoded.email;
+
+            // Check if the product exists and belongs to the seller
+            const product = await productsCollection.findOne({ _id: new ObjectId(id), sellerEmail });
+            if (!product) {
+                return res.send({ message: "Product not found or you are not the seller" });
+            }
+
+            // Delete the product
+            const result = await productsCollection.deleteOne({ _id: new ObjectId(id) });
+            res.send(result);
+        });
 
         // add product on wishlist
         app.patch('/add-to-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
