@@ -136,6 +136,30 @@ const dbConnect = async () => {
             }
         };
 
+        const verifyUnbannedUser = async (req, res, next) => {
+            try {
+                const email = req.decoded?.email;
+                if (!email) {
+                    return res.status(400).send({ message: "Email not found in token." });
+                }
+
+                const user = await usersCollection.findOne({ email });
+                if (!user) {
+                    return res.status(404).send({ message: "User not found." });
+                }
+
+                if (user.userStatus === "banned") {
+                    return res.status(403).send({ message: "User is banned and cannot access this resource." });
+                }
+
+                next();
+            } catch (error) {
+                console.error("Error in verifyUnbannedUser middleware:", error);
+                return res.status(500).send({ message: "Internal server error." });
+            }
+        };
+
+
 
         // crud
 
@@ -164,14 +188,14 @@ const dbConnect = async () => {
 
         await ensureAdminExists();
 
-        // View all users
+        // View all unbanned users
         app.get('/all-users', verifyJWT, verifyAdmin, async (req, res) => {
-            const users = await usersCollection.find().toArray();
+            const users = await usersCollection.find({ userStatus: "unbanned" }).toArray();
             res.send(users);
         });
 
         // get single user
-        app.get('/get-user/:email', verifyJWT, async (req, res) => {
+        app.get('/get-user/:email', verifyJWT, verifyUnbannedUser, async (req, res) => {
             const { email } = req.params;
             const user = await usersCollection.findOne({ email });
             if (!user) {
@@ -190,15 +214,21 @@ const dbConnect = async () => {
                 return res.send({ message: "Invalid role" });
             }
 
+            const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+            if (!user) {
+                return res.send({ message: "User not found" });
+
+            }
+
+            if (user.userStatus === "banned") {
+                return res.status(403).send({ message: "User is banned and cannot access this resource." });
+            }
+
             // Update the user's role
             const result = await usersCollection.updateOne(
                 { _id: new ObjectId(id) },
                 { $set: { role, updatedAt: new Date() } }
             );
-
-            if (result.modifiedCount === 0) {
-                return res.send({ message: "User not found" });
-            }
 
             res.send(result);
         });
@@ -392,6 +422,9 @@ const dbConnect = async () => {
             if (!user) {
                 return res.send({ message: "User not found" });
             }
+            if (user.userStatus === "banned") {
+                return res.status(403).send({ message: "User is banned and cannot access this resource." });
+            }
 
             // Fetch product details for each product in the wishlist
             const wishlistProducts = await productsCollection.find({ _id: { $in: user.wishlist.map(id => new ObjectId(String(id))) } }).toArray();
@@ -404,6 +437,14 @@ const dbConnect = async () => {
             const { productId } = req.body;
             if (!productId) {
                 return res.send({ message: "Product ID is required" });
+            }
+
+            const user = await usersCollection.findOne({ email: req.decoded.email });
+            if (!user) {
+                return res.status(404).send({ message: "User not found" });
+            }
+            if (user.userStatus === "banned") {
+                return res.status(403).send({ message: "User is banned and cannot access this resource." });
             }
 
             const result = await usersCollection.updateOne(
@@ -425,6 +466,9 @@ const dbConnect = async () => {
             if (!user) {
                 return res.status(404).send({ message: "User not found" });
             }
+            if (user.userStatus === "banned") {
+                return res.status(403).send({ message: "User is banned and cannot access this resource." });
+            }
             if (user.wishlist && user.wishlist.includes(productId)) {
                 return res.send({ message: "Product already in wishlist" });
             }
@@ -444,6 +488,9 @@ const dbConnect = async () => {
             if (!user) {
                 return res.send({ message: "User not found" });
             }
+            if (user.userStatus === "banned") {
+                return res.status(403).send({ message: "User is banned and cannot access this resource." });
+            }
 
             // Fetch product details for each product in the cart
             const cartProducts = await productsCollection.find({ _id: { $in: user.cart.map(id => new ObjectId(id)) } }).toArray();
@@ -456,6 +503,13 @@ const dbConnect = async () => {
             const { productId } = req.body;
             if (!productId) {
                 return res.send({ message: "Product ID is required" });
+            }
+            const user = await usersCollection.findOne({ email: req.decoded.email });
+            if (!user) {
+                return res.status(404).send({ message: "User not found" });
+            }
+            if (user.userStatus === "banned") {
+                return res.status(403).send({ message: "User is banned and cannot access this resource." });
             }
 
             const result = await usersCollection.updateOne(
@@ -482,6 +536,9 @@ const dbConnect = async () => {
             const user = await usersCollection.findOne({ email });
             if (!user) {
                 return res.send({ message: "User not found" });
+            }
+            if (user.userStatus === "banned") {
+                return res.status(403).send({ message: "User is banned and cannot access this resource." });
             }
 
             if (user.cart && user.cart.includes(productId)) {
@@ -519,14 +576,3 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
-
-
-// Cart: [
-//             {
-//                 Id
-//                 userId
-//                 productId:
-//                 quantity
-//                 totalPrice
-//             }
-//         ]
