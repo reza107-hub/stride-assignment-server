@@ -13,7 +13,7 @@ app.use(cors());
 
 // jwt
 
-app.post('/authentication', async (req, res) => {
+app.post('/api/authentication', async (req, res) => {
     const { email } = req.body;
     if (!email) {
         return res.send({ message: "Email is required" });
@@ -189,13 +189,13 @@ const dbConnect = async () => {
         await ensureAdminExists();
 
         // View all unbanned users
-        app.get('/all-users', verifyJWT, verifyAdmin, async (req, res) => {
+        app.get('/api/all-users', verifyJWT, verifyAdmin, async (req, res) => {
             const users = await usersCollection.find({ userStatus: "unbanned" }).toArray();
             res.send(users);
         });
 
         // get single user
-        app.get('/get-user/:email', verifyJWT, verifyUnbannedUser, async (req, res) => {
+        app.get('/api/get-user/:email', verifyJWT, verifyUnbannedUser, async (req, res) => {
             const { email } = req.params;
             const user = await usersCollection.findOne({ email });
             if (!user) {
@@ -205,7 +205,7 @@ const dbConnect = async () => {
         });
 
         // Change user role
-        app.patch('/change-role/:id', verifyJWT, verifyAdmin, async (req, res) => {
+        app.patch('/api/change-role/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const { id } = req.params;
             const { role } = req.body;
 
@@ -236,7 +236,7 @@ const dbConnect = async () => {
 
 
         // user create
-        app.post('/create-user', async (req, res) => {
+        app.post('/api/create-user', async (req, res) => {
 
             const { email, name, image, role } = req.body;
 
@@ -273,7 +273,7 @@ const dbConnect = async () => {
         })
 
         // delete user by Ban
-        app.patch('/ban-user/:id', verifyJWT, verifyAdmin, async (req, res) => {
+        app.patch('/api/ban-user/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const { id } = req.params;
 
             // Update user status to 'banned'
@@ -291,7 +291,7 @@ const dbConnect = async () => {
 
         // get  single  product
 
-        app.get('/get-single-product/:productId', async (req, res) => {
+        app.get('/api/get-single-product/:productId', async (req, res) => {
             const { productId } = req.params;
             const product = await productsCollection.findOne({ _id: new ObjectId(productId) });
             if (!product) {
@@ -302,7 +302,7 @@ const dbConnect = async () => {
 
 
         // get product
-        app.get('/get-products', async (req, res) => {
+        app.get('/api/get-products', async (req, res) => {
             const { name, category, brand, limit = 6, page, sort } = req.query;
             const query = {};
 
@@ -335,14 +335,14 @@ const dbConnect = async () => {
 
         // seller View all their listed products
 
-        app.get('/seller-products', verifyJWT, verifySeller, async (req, res) => {
+        app.get('/api/seller-products', verifyJWT, verifySeller, async (req, res) => {
             const sellerEmail = req.decoded.email;
             const products = await productsCollection.find({ sellerEmail }).toArray();
             res.send(products);
         })
 
         // add product
-        app.post('/add-product', verifyJWT, verifySeller, async (req, res) => {
+        app.post('/api/add-product', verifyJWT, verifySeller, async (req, res) => {
             const { name, price, category, brand, details, stock, image } = req.body;
 
             // Construct product object
@@ -367,7 +367,7 @@ const dbConnect = async () => {
 
         // seller can delete their product
 
-        app.delete('/delete-product/:id', verifyJWT, verifySeller, async (req, res) => {
+        app.delete('/api/delete-product/:id', verifyJWT, verifySeller, async (req, res) => {
             const { id } = req.params;
             const sellerEmail = req.decoded.email;
 
@@ -383,7 +383,7 @@ const dbConnect = async () => {
         });
 
         // Update product
-        app.patch('/update-product/:id', verifyJWT, verifySeller, async (req, res) => {
+        app.patch('/api/update-product/:id', verifyJWT, verifySeller, async (req, res) => {
             const { id } = req.params;
             const { name, price, category, brand, details, stock, image } = req.body;
             const sellerEmail = req.decoded.email;
@@ -414,7 +414,7 @@ const dbConnect = async () => {
 
 
         // get user's wishlist
-        app.get('/get-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
+        app.get('/api/get-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
             const email = req.decoded.email;
 
             // Get user and their wishlist
@@ -433,7 +433,7 @@ const dbConnect = async () => {
         });
 
         // remove product from wishlist
-        app.patch('/remove-from-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
+        app.patch('/api/remove-from-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
             const { productId } = req.body;
             if (!productId) {
                 return res.send({ message: "Product ID is required" });
@@ -457,7 +457,7 @@ const dbConnect = async () => {
 
 
         // add product on wishlist
-        app.patch('/add-to-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
+        app.patch('/api/add-to-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
             const { productId } = req.body;
             if (!productId) {
                 return res.send({ message: "Product ID is required" });
@@ -480,7 +480,7 @@ const dbConnect = async () => {
         })
 
         // get user's cart
-        app.get('/get-cart', verifyJWT, verifyBuyer, async (req, res) => {
+        app.get('/api/get-cart', verifyJWT, verifyBuyer, async (req, res) => {
             const email = req.decoded.email;
 
             // Get user and their cart
@@ -499,7 +499,7 @@ const dbConnect = async () => {
         });
 
         // remove product from cart
-        app.patch('/remove-from-cart', verifyJWT, verifyBuyer, async (req, res) => {
+        app.patch('/api/remove-from-cart', verifyJWT, verifyBuyer, async (req, res) => {
             const { productId } = req.body;
             if (!productId) {
                 return res.send({ message: "Product ID is required" });
@@ -521,7 +521,7 @@ const dbConnect = async () => {
         });
 
         // add cart
-        app.patch('/add-cart', verifyJWT, verifyBuyer, async (req, res) => {
+        app.patch('/api/add-cart', verifyJWT, verifyBuyer, async (req, res) => {
             const { productId } = req.body;
 
             const email = req.decoded.email;
