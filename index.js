@@ -383,6 +383,37 @@ const dbConnect = async () => {
         });
 
 
+        // get user's wishlist
+        app.get('/get-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
+            const email = req.decoded.email;
+
+            // Get user and their wishlist
+            const user = await usersCollection.findOne({ email }, { projection: { wishlist: 1, _id: 0 } });
+            if (!user) {
+                return res.send({ message: "User not found" });
+            }
+
+            // Fetch product details for each product in the wishlist
+            const wishlistProducts = await productsCollection.find({ _id: { $in: user.wishlist.map(id => new ObjectId(String(id))) } }).toArray();
+
+            res.send(wishlistProducts);
+        });
+
+        // remove product from wishlist
+        app.patch('/remove-from-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
+            const { productId } = req.body;
+            if (!productId) {
+                return res.send({ message: "Product ID is required" });
+            }
+
+            const result = await usersCollection.updateOne(
+                { email: req.decoded.email },
+                { $pull: { wishlist: productId } }
+            );
+
+            res.send(result);
+        });
+
 
         // add product on wishlist
         app.patch('/add-to-wishlist', verifyJWT, verifyBuyer, async (req, res) => {
@@ -403,6 +434,37 @@ const dbConnect = async () => {
             );
             res.send(result)
         })
+
+        // get user's cart
+        app.get('/get-cart', verifyJWT, verifyBuyer, async (req, res) => {
+            const email = req.decoded.email;
+
+            // Get user and their cart
+            const user = await usersCollection.findOne({ email }, { projection: { cart: 1, _id: 0 } });
+            if (!user) {
+                return res.send({ message: "User not found" });
+            }
+
+            // Fetch product details for each product in the cart
+            const cartProducts = await productsCollection.find({ _id: { $in: user.cart.map(id => new ObjectId(id)) } }).toArray();
+
+            res.send(cartProducts);
+        });
+
+        // remove product from cart
+        app.patch('/remove-from-cart', verifyJWT, verifyBuyer, async (req, res) => {
+            const { productId } = req.body;
+            if (!productId) {
+                return res.send({ message: "Product ID is required" });
+            }
+
+            const result = await usersCollection.updateOne(
+                { email: req.decoded.email },
+                { $pull: { cart: productId } }
+            );
+
+            res.send(result);
+        });
 
         // add cart
         app.patch('/add-cart', verifyJWT, verifyBuyer, async (req, res) => {
