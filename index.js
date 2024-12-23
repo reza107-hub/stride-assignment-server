@@ -170,6 +170,16 @@ const dbConnect = async () => {
             res.send(users);
         });
 
+        // get single user
+        app.get('/get-user/:email', verifyJWT, async (req, res) => {
+            const { email } = req.params;
+            const user = await usersCollection.findOne({ email });
+            if (!user) {
+                return res.send({ message: "User not found" });
+            }
+            res.send(user);
+        });
+
         // Change user role
         app.patch('/change-role/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const { id } = req.params;
@@ -205,7 +215,7 @@ const dbConnect = async () => {
             }
 
             if (email === "sabab54874@rabitex.com") {
-                return
+                return res.send({ acknowledge: true });
             }
 
             const existingUser = await usersCollection.findOne({ email });
@@ -225,8 +235,7 @@ const dbConnect = async () => {
 
             if (role === "buyer") {
                 user.wishlist = [],
-                    user.cart = [],
-                    user.totalCartPrice = null
+                    user.cart = []
             }
 
             const result = await usersCollection.insertOne(user)
@@ -250,10 +259,21 @@ const dbConnect = async () => {
             res.send({ message: "User banned successfully" });
         });
 
+        // get  single  product
+
+        app.get('/get-single-product/:productId', async (req, res) => {
+            const { productId } = req.params;
+            const product = await productsCollection.findOne({ _id: new ObjectId(productId) });
+            if (!product) {
+                return res.send({ message: "Product not found" });
+            }
+            res.send(product);
+        })
+
 
         // get product
         app.get('/get-products', async (req, res) => {
-            const { name, category, brand, limit = 10, page = 1, sort } = req.query;
+            const { name, category, brand, limit = 6, page = 1, sort } = req.query;
             const query = {};
 
             // Add filters to the query
@@ -275,7 +295,12 @@ const dbConnect = async () => {
                 .limit(Number(limit))
                 .toArray();
 
-            res.send(products);
+            const totalProducts = await productsCollection.countDocuments(query);
+
+            const categories = [...new Set(products.map(product => product.category))];
+            const brands = [...new Set(products.map(product => product.brand))];
+
+            res.send({ products, categories, brands, totalProducts });
         })
 
         // seller View all their listed products
@@ -365,7 +390,14 @@ const dbConnect = async () => {
             if (!productId) {
                 return res.send({ message: "Product ID is required" });
             }
-            const result = await usersCollection.findOneAndUpdate(
+            const user = await usersCollection.findOne({ email: req.decoded.email });
+            if (!user) {
+                return res.status(404).send({ message: "User not found" });
+            }
+            if (user.wishlist && user.wishlist.includes(productId)) {
+                return res.send({ message: "Product already in wishlist" });
+            }
+            const result = await usersCollection.updateOne(
                 { email: req.decoded.email },
                 { $addToSet: { wishlist: productId } },
             );
@@ -374,12 +406,12 @@ const dbConnect = async () => {
 
         // add cart
         app.patch('/add-cart', verifyJWT, verifyBuyer, async (req, res) => {
-            const { productId, quantity } = req.body;
+            const { productId } = req.body;
 
             const email = req.decoded.email;
 
             // Fetch product details to ensure it's valid
-            const product = await productsCollection.findOne({ _id: new ObjectId(toString(productId)) });
+            const product = await productsCollection.findOne({ _id: new ObjectId(String(productId)) });
             if (!product) {
                 return res.send({ message: "Product not found" });
             }
@@ -390,43 +422,16 @@ const dbConnect = async () => {
                 return res.send({ message: "User not found" });
             }
 
-            const productInCart = user.cart.find(item => item.productId.toString() === productId);
-
-            if (productInCart) {
-                // If the product is already in the cart, update the quantity
-                const updatedCart = user.cart.map(item =>
-                    item.productId.toString() === productId ?
-                        { ...item, quantity: item.quantity + quantity, totalPrice: item.totalPrice + (product.price * quantity) } : item
-                );
-
-                const updatedTotalCartPrice = updatedCart.reduce((acc, item) => acc + item.totalPrice, 0);
-
-                await usersCollection.updateOne(
-                    { email },
-                    {
-                        $set: { cart: updatedCart, totalCartPrice: updatedTotalCartPrice },
-                    }
-                );
-                return res.send({ message: "Cart updated successfully" });
-            } else {
-                // If the product is not in the cart, add it
-                const newItem = {
-                    productId,
-                    quantity,
-                    totalPrice: product.price * quantity
-                };
-
-                const updatedCart = [...user.cart, newItem];
-                const updatedTotalCartPrice = updatedCart.reduce((acc, item) => acc + item.totalPrice, 0);
-
-                await usersCollection.updateOne(
-                    { email },
-                    {
-                        $set: { cart: updatedCart, totalCartPrice: updatedTotalCartPrice },
-                    }
-                );
-                return res.send({ message: "Product added to cart successfully" });
+            if (user.cart && user.cart.includes(productId)) {
+                return res.send({ message: "Product already in cart" });
             }
+
+            const result = await usersCollection.updateOne(
+                { email: req.decoded.email },
+                { $addToSet: { cart: productId } }
+            );
+
+            res.send(result);
         });
 
 
