@@ -273,7 +273,7 @@ const dbConnect = async () => {
 
         // get product
         app.get('/get-products', async (req, res) => {
-            const { name, category, brand, limit = 6, page = 1, sort } = req.query;
+            const { name, category, brand, limit = 6, page, sort } = req.query;
             const query = {};
 
             // Add filters to the query
@@ -376,7 +376,7 @@ const dbConnect = async () => {
             updatedProduct.updatedAt = new Date();
 
             const result = await productsCollection.updateOne(
-                { _id: new ObjectId(id) },
+                { _id: new ObjectId(product._id) },
                 { $set: updatedProduct }
             );
             res.send(result);
